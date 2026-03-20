@@ -1,4 +1,4 @@
-const { syncAppointmentToSalesforce } = require("../shared/salesforceService");
+const { syncAppointmentToSalesforce } = require("../src/salesforceService");
 
 module.exports = async function (context, documents) {
     try {
