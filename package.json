@@ -1,9 +1,9 @@
 {
   "name": "salesforce-sync",
   "version": "1.0.0",
-  "main": "index.js",
   "dependencies": {
     "@azure/cosmos": "^3.17.3",
-    "jsforce": "^2.0.0"
+    "jsforce": "^2.0.0",
+    "axios": "^1.13.6"
   }
 }

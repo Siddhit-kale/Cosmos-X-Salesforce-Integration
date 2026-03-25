@@ -4,10 +4,10 @@
       "name": "documents",
       "type": "cosmosDBTrigger",
       "direction": "in",
-      "connectionStringSetting": "AccountEndpoint=https://healthcaredb.documents.azure.com:443/;AccountKey=qv8cQkZXssUTIYEYVgjS1mQJzbOsOwGTjhCdoiyQzEV07E9gAYKI4UBVd4edHbh50V3Cy4n6dKzJACDbk9dh4g==;",
+      "connectionStringSetting": "COSMOS_DB_CONNECTION_STRING",
       "databaseName": "HealthcareCRM",
       "collectionName": "patients",
-      "leaseCollectionName": "leases",
+      "leaseCollectionName": "leases-patients",
       "createLeaseCollectionIfNotExists": true
     }
   ]

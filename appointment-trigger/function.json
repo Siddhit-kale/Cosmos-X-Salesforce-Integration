@@ -1,14 +1,14 @@
 {
-    "bindings": [
-      {
-        "name": "documents",
-        "type": "cosmosDBTrigger",
-        "direction": "in",
-        "leaseCollectionName": "leases-appt",
-        "connectionStringSetting": "AccountEndpoint=https://healthcaredb.documents.azure.com:443/;AccountKey=qv8cQkZXssUTIYEYVgjS1mQJzbOsOwGTjhCdoiyQzEV07E9gAYKI4UBVd4edHbh50V3Cy4n6dKzJACDbk9dh4g==;",
-        "databaseName": "HealthcareCRM",
-        "collectionName": "appointments",
-        "createLeaseCollectionIfNotExists": true
-      }
-    ]
-  }
+  "bindings": [
+    {
+      "name": "documents",
+      "type": "cosmosDBTrigger",
+      "direction": "in",
+      "connectionStringSetting": "COSMOS_DB_CONNECTION_STRING",
+      "databaseName": "HealthcareCRM",
+      "collectionName": "appointments",
+      "leaseCollectionName": "leases-appt",
+      "createLeaseCollectionIfNotExists": true
+    }
+  ]
+}
