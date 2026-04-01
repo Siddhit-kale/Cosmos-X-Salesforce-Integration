@@ -1,58 +1,67 @@
-const { CosmosClient } = require("@azure/cosmos");
-const { syncPatientToSalesforce } = require("../shared/salesforceService");
-
 module.exports = async function (context, req) {
     let cosmosStatus = "Not Tested";
     let sfStatus = "Not Tested";
+    let loadErrors = [];
 
-    // Test Cosmos DB
+    // 1. Test Module Loading
+    let CosmosClient, salesforceService;
     try {
-        const connectionString = process.env.COSMOS_DB_CONNECTION_STRING;
-        if (connectionString) {
-            const client = new CosmosClient(connectionString);
-            const { resources } = await client.database("HealthcareCRM").container("patients").items.query("SELECT TOP 1 * FROM c").fetchAll();
-            cosmosStatus = `✅ Connected (Found ${resources.length} records)`;
-        } else {
-            cosmosStatus = "❌ Missing Connection String";
-        }
-    } catch (err) {
-        cosmosStatus = `❌ Error: ${err.message}`;
+        CosmosClient = require("@azure/cosmos").CosmosClient;
+    } catch (e) {
+        loadErrors.push(`@azure/cosmos: ${e.message}`);
     }
 
-    // Test Salesforce Auth
     try {
-        if (process.env.SALESFORCE_USERNAME) {
-            // We use a small dummy sync to test auth
-            const { syncPatientToSalesforce } = require("../shared/salesforceService");
-            // Just test the authenticate() call internally
-            const { authenticate } = require("../shared/salesforceService");
-            // Note: internal require might be redundant but safe
-            sfStatus = "✅ Authenticating...";
-            await syncPatientToSalesforce({ email: "test@example.com", name: "Test Probe" });
-            sfStatus = "✅ Connected & Authenticated";
-        } else {
-            sfStatus = "❌ Missing Salesforce Credentials";
+        salesforceService = require("../shared/salesforceService");
+    } catch (e) {
+        loadErrors.push(`shared/salesforceService (or axios): ${e.message}`);
+    }
+
+    // 2. Test Cosmos DB
+    if (CosmosClient) {
+        try {
+            const connectionString = process.env.COSMOS_DB_CONNECTION_STRING;
+            if (connectionString) {
+                const client = new CosmosClient(connectionString);
+                const { resources } = await client.database("HealthcareCRM").container("patients").items.query("SELECT TOP 1 * FROM c").fetchAll();
+                cosmosStatus = `✅ Connected (Found ${resources.length} records)`;
+            } else {
+                cosmosStatus = "❌ Missing Connection String";
+            }
+        } catch (err) {
+            cosmosStatus = `❌ Runtime Error: ${err.message}`;
         }
-    } catch (err) {
-        sfStatus = `❌ Auth Error: ${err.message}`;
+    } else {
+        cosmosStatus = "❌ Module Failed to Load";
+    }
+
+    // 3. Test Salesforce
+    if (salesforceService) {
+        try {
+            if (process.env.SALESFORCE_USERNAME) {
+                await salesforceService.syncPatientToSalesforce({ email: "test@example.com", name: "Test Probe" });
+                sfStatus = "✅ Connected & Authenticated";
+            } else {
+                sfStatus = "❌ Missing Salesforce Credentials";
+            }
+        } catch (err) {
+            sfStatus = `❌ Auth Error: ${err.message}`;
+        }
+    } else {
+        sfStatus = "❌ Module Failed to Load";
     }
 
     context.res = {
         status: 200,
         body: {
-            message: "🔍 Cloud Connectivity Report",
+            message: "🔍 Isolated Cloud Connectivity Report",
             nodeVersion: process.version,
+            loadErrors: loadErrors.length > 0 ? loadErrors : "None",
             diagnostics: {
                 cosmosDB: cosmosStatus,
                 salesforce: sfStatus
             },
-            envVarsExist: {
-                COSMOS: !!process.env.COSMOS_DB_CONNECTION_STRING,
-                SF_LOGIN: !!process.env.SALESFORCE_LOGIN_URL,
-                SF_USER: !!process.env.SALESFORCE_USERNAME
-            },
-            time: new Date().toISOString(),
-            tip: "If Salesforce fails with 401/403, check 'Login History' in Salesforce and look for Azure's IP."
+            time: new Date().toISOString()
         }
     };
 };
