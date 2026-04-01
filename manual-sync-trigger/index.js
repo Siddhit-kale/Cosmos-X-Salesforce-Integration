@@ -11,6 +11,22 @@ module.exports = async function (context, req) {
         return;
     }
 
+    const requiredEnvVars = [
+        "SALESFORCE_LOGIN_URL",
+        "SALESFORCE_CLIENT_ID",
+        "SALESFORCE_CLIENT_SECRET",
+        "SALESFORCE_USERNAME",
+        "SALESFORCE_PASSWORD"
+    ];
+
+    const missingVars = requiredEnvVars.filter(v => !process.env[v]);
+    if (missingVars.length > 0) {
+        const errorMsg = `❌ Missing Environment Variables: ${missingVars.join(", ")}. Please check Azure Portal Configuration.`;
+        context.log.error(errorMsg);
+        context.res = { status: 500, body: { error: errorMsg } };
+        return;
+    }
+
     let body = req.body;
     if (typeof body === "string") {
         try {
@@ -55,6 +71,14 @@ module.exports = async function (context, req) {
         }
     } catch (err) {
         context.log.error("❌ Sync error:", err.message);
-        context.res = { status: 500, body: { message: "❌ Sync failed", error: err.message } };
+        context.res = {
+            status: 500,
+            body: {
+                message: "❌ Sync failed",
+                error: err.message,
+                stack: err.stack,
+                hint: "Check Salesforce credentials and Node.js version."
+            }
+        };
     }
 };

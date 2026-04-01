@@ -1,4 +1,5 @@
 const jsforce = require("jsforce");
+const axios = require("axios");
 
 let conn = null;
 
@@ -6,34 +7,37 @@ async function authenticate() {
     if (conn && conn.accessToken) return conn;
 
     const loginUrl = process.env.SALESFORCE_LOGIN_URL;
+    if (!loginUrl) throw new Error("Missing SALESFORCE_LOGIN_URL");
 
-    const params = new URLSearchParams({
-        grant_type: "password",
-        client_id: process.env.SALESFORCE_CLIENT_ID,
-        client_secret: process.env.SALESFORCE_CLIENT_SECRET,
-        username: process.env.SALESFORCE_USERNAME,
-        password: process.env.SALESFORCE_PASSWORD + (process.env.SALESFORCE_SECURITY_TOKEN || "")
-    });
+    console.log(`🔄 Attempting Salesforce Auth: ${loginUrl}`);
 
-    const res = await fetch(`${loginUrl}/services/oauth2/token`, {
-        method: "POST",
-        body: params
-    });
+    try {
+        const params = new URLSearchParams({
+            grant_type: "password",
+            client_id: process.env.SALESFORCE_CLIENT_ID,
+            client_secret: process.env.SALESFORCE_CLIENT_SECRET,
+            username: process.env.SALESFORCE_USERNAME,
+            password: process.env.SALESFORCE_PASSWORD + (process.env.SALESFORCE_SECURITY_TOKEN || "")
+        });
 
-    const data = await res.json();
+        const res = await axios.post(`${loginUrl}/services/oauth2/token`, params.toString(), {
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+        });
 
-    if (!res.ok) {
-        console.error("OAuth Error:", data);
-        throw new Error(data.error_description || "Authentication failed");
+        const data = res.data;
+
+        conn = new jsforce.Connection({
+            instanceUrl: data.instance_url,
+            accessToken: data.access_token
+        });
+
+        console.log("✅ Salesforce connected successfully");
+        return conn;
+    } catch (err) {
+        const errorData = err.response ? err.response.data : err.message;
+        console.error("❌ OAuth Error detail:", JSON.stringify(errorData));
+        throw new Error(`Authentication failed: ${err.message}`);
     }
-
-    conn = new jsforce.Connection({
-        instanceUrl: data.instance_url,
-        accessToken: data.access_token
-    });
-
-    console.log("✅ Salesforce connected successfully");
-    return conn;
 }
 
 async function uploadFile(connection, base64Data, patientName, recordId, label) {

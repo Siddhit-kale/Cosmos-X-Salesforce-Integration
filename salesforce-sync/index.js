@@ -7,10 +7,20 @@ module.exports = async function (context, req) {
     const connectionString = process.env.COSMOS_DB_CONNECTION_STRING;
     const databaseId = "HealthcareCRM";
 
-    if (!connectionString) {
-        const errorMsg = "Missing COSMOS_DB_CONNECTION_STRING in local.settings.json.";
-        context.log.error(`${errorMsg}`);
-        context.res = { status: 500, body: errorMsg };
+    const requiredEnvVars = [
+        "COSMOS_DB_CONNECTION_STRING",
+        "SALESFORCE_LOGIN_URL",
+        "SALESFORCE_CLIENT_ID",
+        "SALESFORCE_CLIENT_SECRET",
+        "SALESFORCE_USERNAME",
+        "SALESFORCE_PASSWORD"
+    ];
+
+    const missingVars = requiredEnvVars.filter(v => !process.env[v]);
+    if (missingVars.length > 0) {
+        const errorMsg = `❌ Missing Environment Variables: ${missingVars.join(", ")}. Please check Azure Portal Configuration.`;
+        context.log.error(errorMsg);
+        context.res = { status: 500, body: { error: errorMsg } };
         return;
     }
 
@@ -79,7 +89,14 @@ module.exports = async function (context, req) {
         };
 
     } catch (err) {
-        context.log.error("Critical error:", err.message);
-        context.res = { status: 500, body: { error: err.message } };
+        context.log.error("❌ Critical error:", err.message);
+        context.res = {
+            status: 500,
+            body: {
+                error: err.message,
+                stack: err.stack,
+                hint: "Check if Node.js version is 18+ and all Environment Variables are correct."
+            }
+        };
     }
 };
