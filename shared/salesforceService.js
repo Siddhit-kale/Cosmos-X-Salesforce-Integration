@@ -58,13 +58,21 @@ async function uploadFile(connection, base64Data, patientName, recordId, label) 
         const fileName = `${patientName}_${label}.${extension}`;
 
         // Check if file already exists for this record
-        const existingFiles = await connection.query(
-            `SELECT Id FROM ContentVersion WHERE Title = '${fileName}' AND IsLatest = true AND ContentDocumentId IN (SELECT ContentDocumentId FROM ContentDocumentLink WHERE LinkedEntityId = '${recordId}')`
+        // ContentDocumentLink does not support semi-joins, so we query it separately
+        const links = await connection.query(
+            `SELECT ContentDocumentId FROM ContentDocumentLink WHERE LinkedEntityId = '${recordId}'`
         );
 
-        if (existingFiles.totalSize > 0) {
-            console.log(`ℹ️ File already exists, skipping upload: ${fileName}`);
-            return null;
+        if (links.totalSize > 0) {
+            const docIds = links.records.map(r => `'${r.ContentDocumentId}'`).join(",");
+            const existingFiles = await connection.query(
+                `SELECT Id FROM ContentVersion WHERE Title = '${fileName}' AND IsLatest = true AND ContentDocumentId IN (${docIds})`
+            );
+
+            if (existingFiles.totalSize > 0) {
+                console.log(`ℹ️ File already exists, skipping upload: ${fileName}`);
+                return null;
+            }
         }
 
         const result = await connection.sobject("ContentVersion").create({
@@ -193,16 +201,39 @@ async function syncAppointmentToSalesforce(appointment) {
     };
 
     try {
-        const result = await connection
-            .sobject("Appointment__c")
-            .create(appointmentData);
+        // Query to check if appointment already exists (by Patient Email, Date, and Time)
+        const existing = await connection.query(
+            `SELECT Id FROM Appointment__c WHERE Appointment_Date__c = ${appointment.appointmentDate} AND Appointment_Time__c = '${apptTime}' AND Patient__r.Email__c = '${appointment.patientEmail}'`
+        );
 
-        if (!result.success) {
-            throw new Error(`Appointment setup failed: ${JSON.stringify(result.errors)}`);
+        if (existing.totalSize > 0) {
+            const recordId = existing.records[0].Id;
+            const result = await connection
+                .sobject("Appointment__c")
+                .update({
+                    Id: recordId,
+                    Status__c: appointment.status || null,
+                    Symptoms__c: appointment.symptoms || null
+                });
+
+            if (!result.success) {
+                throw new Error(`Appointment update failed: ${JSON.stringify(result.errors)}`);
+            }
+
+            console.log(`✅ Appointment updated: ${recordId}`);
+            return result;
+        } else {
+            const result = await connection
+                .sobject("Appointment__c")
+                .create(appointmentData);
+
+            if (!result.success) {
+                throw new Error(`Appointment setup failed: ${JSON.stringify(result.errors)}`);
+            }
+
+            console.log(`✅ Appointment created: ${appointment.id || appointment.patientEmail}`);
+            return result;
         }
-
-        console.log(`✅ Appointment synced: ${appointment.id || appointment.patientEmail}`);
-        return result;
 
     } catch (err) {
         console.error(`❌ Appointment sync error:`, err.message);
