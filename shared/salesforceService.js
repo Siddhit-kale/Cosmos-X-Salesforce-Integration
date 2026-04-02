@@ -6,23 +6,33 @@ let conn = null;
 async function authenticate() {
     if (conn && conn.accessToken) return conn;
 
-    let loginUrl = process.env.SALESFORCE_LOGIN_URL;
-    if (!loginUrl) throw new Error("Missing SALESFORCE_LOGIN_URL");
+    const env = {
+        loginUrl: (process.env.SALESFORCE_LOGIN_URL || "").trim(),
+        clientId: (process.env.SALESFORCE_CLIENT_ID || "").trim(),
+        clientSecret: (process.env.SALESFORCE_CLIENT_SECRET || "").trim(),
+        username: (process.env.SALESFORCE_USERNAME || "").trim(),
+        password: (process.env.SALESFORCE_PASSWORD || "").trim(),
+        token: (process.env.SALESFORCE_SECURITY_TOKEN || "").trim()
+    };
 
-    loginUrl = loginUrl.replace(/\/$/, "");
+    if (!env.loginUrl) throw new Error("Missing SALESFORCE_LOGIN_URL");
+    if (!env.clientId) throw new Error("Missing SALESFORCE_CLIENT_ID");
+    if (!env.username) throw new Error("Missing SALESFORCE_USERNAME");
 
-    console.log(`Attempting Salesforce Auth: ${loginUrl}`);
+    const sanitizedLoginUrl = env.loginUrl.replace(/\/$/, "");
+
+    console.log(`Attempting Salesforce Auth: ${sanitizedLoginUrl}`);
 
     try {
         const params = new URLSearchParams({
             grant_type: "password",
-            client_id: process.env.SALESFORCE_CLIENT_ID,
-            client_secret: process.env.SALESFORCE_CLIENT_SECRET,
-            username: process.env.SALESFORCE_USERNAME,
-            password: process.env.SALESFORCE_PASSWORD + (process.env.SALESFORCE_SECURITY_TOKEN || "")
+            client_id: env.clientId,
+            client_secret: env.clientSecret,
+            username: env.username,
+            password: env.password + env.token
         });
 
-        const res = await axios.post(`${loginUrl}/services/oauth2/token`, params.toString(), {
+        const res = await axios.post(`${sanitizedLoginUrl}/services/oauth2/token`, params.toString(), {
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
         });
 
@@ -39,7 +49,6 @@ async function authenticate() {
         const errorData = err.response ? err.response.data : { message: err.message };
         console.error("OAuth Error detail:", JSON.stringify(errorData));
 
-        // Expose the specific Salesforce error in the thrown Error
         const errorDetail = typeof errorData === "string" ? errorData : JSON.stringify(errorData);
         throw new Error(`Authentication failed: ${errorDetail}`);
     }
