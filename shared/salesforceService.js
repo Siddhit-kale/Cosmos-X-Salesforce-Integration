@@ -6,8 +6,10 @@ let conn = null;
 async function authenticate() {
     if (conn && conn.accessToken) return conn;
 
-    const loginUrl = process.env.SALESFORCE_LOGIN_URL;
+    let loginUrl = process.env.SALESFORCE_LOGIN_URL;
     if (!loginUrl) throw new Error("Missing SALESFORCE_LOGIN_URL");
+
+    loginUrl = loginUrl.replace(/\/$/, "");
 
     console.log(`Attempting Salesforce Auth: ${loginUrl}`);
 
@@ -34,9 +36,12 @@ async function authenticate() {
         console.log("Salesforce connected successfully");
         return conn;
     } catch (err) {
-        const errorData = err.response ? err.response.data : err.message;
+        const errorData = err.response ? err.response.data : { message: err.message };
         console.error("OAuth Error detail:", JSON.stringify(errorData));
-        throw new Error(`Authentication failed: ${err.message}`);
+
+        // Expose the specific Salesforce error in the thrown Error
+        const errorDetail = typeof errorData === "string" ? errorData : JSON.stringify(errorData);
+        throw new Error(`Authentication failed: ${errorDetail}`);
     }
 }
 
@@ -117,7 +122,7 @@ async function syncPatientToSalesforce(patient) {
         const lower = genderValue.toLowerCase();
         if (lower === "male") genderValue = "Male";
         else if (lower === "female") genderValue = "Female";
-        else genderValue = "Other"; 
+        else genderValue = "Other";
     }
 
     const patientData = {
