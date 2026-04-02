@@ -9,7 +9,7 @@ async function authenticate() {
     const loginUrl = process.env.SALESFORCE_LOGIN_URL;
     if (!loginUrl) throw new Error("Missing SALESFORCE_LOGIN_URL");
 
-    console.log(`🔄 Attempting Salesforce Auth: ${loginUrl}`);
+    console.log(`Attempting Salesforce Auth: ${loginUrl}`);
 
     try {
         const params = new URLSearchParams({
@@ -31,11 +31,11 @@ async function authenticate() {
             accessToken: data.access_token
         });
 
-        console.log("✅ Salesforce connected successfully");
+        console.log("Salesforce connected successfully");
         return conn;
     } catch (err) {
         const errorData = err.response ? err.response.data : err.message;
-        console.error("❌ OAuth Error detail:", JSON.stringify(errorData));
+        console.error("OAuth Error detail:", JSON.stringify(errorData));
         throw new Error(`Authentication failed: ${err.message}`);
     }
 }
@@ -61,8 +61,6 @@ async function uploadFile(connection, base64Data, patientName, recordId, label) 
         const safeBase64 = buffer.toString("base64");
         const fileName = `${patientName}_${label}.${extension}`;
 
-        // Check if file already exists for this record
-        // ContentDocumentLink does not support semi-joins, so we query it separately
         const links = await connection.query(
             `SELECT ContentDocumentId FROM ContentDocumentLink WHERE LinkedEntityId = '${recordId}'`
         );
@@ -74,7 +72,7 @@ async function uploadFile(connection, base64Data, patientName, recordId, label) 
             );
 
             if (existingFiles.totalSize > 0) {
-                console.log(`ℹ️ File already exists, skipping upload: ${fileName}`);
+                console.log(`ℹFile already exists, skipping upload: ${fileName}`);
                 return null;
             }
         }
@@ -101,11 +99,11 @@ async function uploadFile(connection, base64Data, patientName, recordId, label) 
             ShareType: "V"
         });
 
-        console.log(`📎 File uploaded: ${fileName}`);
+        console.log(`File uploaded: ${fileName}`);
         return documentId;
 
     } catch (err) {
-        console.error("❌ File upload error:", err.message);
+        console.error("File upload error:", err.message);
         throw err;
     }
 }
@@ -113,14 +111,13 @@ async function uploadFile(connection, base64Data, patientName, recordId, label) 
 async function syncPatientToSalesforce(patient) {
     const connection = await authenticate();
 
-    // Normalize Gender
     let genderValue = patient.gender || null;
     if (genderValue) {
         genderValue = genderValue.trim();
         const lower = genderValue.toLowerCase();
         if (lower === "male") genderValue = "Male";
         else if (lower === "female") genderValue = "Female";
-        else genderValue = "Other"; // Matches your Salesforce picklist
+        else genderValue = "Other"; 
     }
 
     const patientData = {
@@ -146,7 +143,7 @@ async function syncPatientToSalesforce(patient) {
 
         const recordId = result.id;
 
-        console.log(`✅ Patient synced: ${patient.email}`);
+        console.log(`Patient synced: ${patient.email}`);
 
         if (patient.identityProof) {
             await uploadFile(
@@ -171,7 +168,7 @@ async function syncPatientToSalesforce(patient) {
         return result;
 
     } catch (err) {
-        console.error(`❌ Patient sync error (${patient.email}):`, err.message);
+        console.error(`Patient sync error (${patient.email}):`, err.message);
         throw err;
     }
 }
@@ -179,7 +176,6 @@ async function syncPatientToSalesforce(patient) {
 async function syncAppointmentToSalesforce(appointment) {
     const connection = await authenticate();
 
-    // Normalize Appointment Time to slots
     let apptTime = appointment.appointmentTime || null;
     if (apptTime && !apptTime.includes("-")) {
         const timeMap = {
@@ -205,7 +201,6 @@ async function syncAppointmentToSalesforce(appointment) {
     };
 
     try {
-        // Query to check if appointment already exists (by Patient Email, Date, and Time)
         const existing = await connection.query(
             `SELECT Id FROM Appointment__c WHERE Appointment_Date__c = ${appointment.appointmentDate} AND Appointment_Time__c = '${apptTime}' AND Patient__r.Email__c = '${appointment.patientEmail}'`
         );
@@ -224,7 +219,7 @@ async function syncAppointmentToSalesforce(appointment) {
                 throw new Error(`Appointment update failed: ${JSON.stringify(result.errors)}`);
             }
 
-            console.log(`✅ Appointment updated: ${recordId}`);
+            console.log(`Appointment updated: ${recordId}`);
             return result;
         } else {
             const result = await connection
@@ -235,12 +230,12 @@ async function syncAppointmentToSalesforce(appointment) {
                 throw new Error(`Appointment setup failed: ${JSON.stringify(result.errors)}`);
             }
 
-            console.log(`✅ Appointment created: ${appointment.id || appointment.patientEmail}`);
+            console.log(`Appointment created: ${appointment.id || appointment.patientEmail}`);
             return result;
         }
 
     } catch (err) {
-        console.error(`❌ Appointment sync error:`, err.message);
+        console.error(`Appointment sync error:`, err.message);
         throw err;
     }
 }

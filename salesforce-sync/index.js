@@ -18,7 +18,7 @@ module.exports = async function (context, req) {
 
     const missingVars = requiredEnvVars.filter(v => !process.env[v]);
     if (missingVars.length > 0) {
-        const errorMsg = `❌ Missing Environment Variables: ${missingVars.join(", ")}. Please check Azure Portal Configuration.`;
+        const errorMsg = `Missing Environment Variables: ${missingVars.join(", ")}. Please check Azure Portal Configuration.`;
         context.log.error(errorMsg);
         context.res = { status: 500, body: { error: errorMsg } };
         return;
@@ -30,7 +30,6 @@ module.exports = async function (context, req) {
         const client = new CosmosClient(connectionString);
         const database = client.database(databaseId);
 
-        // --- PART 1: PATIENTS ---
         let patients = [];
         try {
             const { resources } = await database.container("patients").items.readAll().fetchAll();
@@ -51,10 +50,8 @@ module.exports = async function (context, req) {
             }
         }
 
-        // Delay to prevent rate limiting
         await new Promise(resolve => setTimeout(resolve, 1500));
 
-        // --- PART 2: APPOINTMENTS ---
         let appointments = [];
         try {
             const { resources } = await database.container("appointments").items.readAll().fetchAll();
@@ -89,7 +86,7 @@ module.exports = async function (context, req) {
         };
 
     } catch (err) {
-        context.log.error("❌ Critical error:", err.message);
+        context.log.error("Critical error:", err.message);
         context.res = {
             status: 500,
             body: {
